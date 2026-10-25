@@ -5,26 +5,38 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   macos:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
+      - name: Cache JUCE sources
+        uses: actions/cache@v4
+        with:
+          path: build/_deps/juce-src
+          key: infinatikick-juce-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
+
       - name: Configure (universal arm64 + x86_64)
         run: >
-          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake -S . -B build -G Xcode -DINFINATI_COPY_PLUGIN=OFF
           -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
-          -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
 
       - name: Build
-        run: cmake --build build --config Release -j 4
+        run: cmake --build build --config Release --parallel 3
 
       - name: Render tests
         run: ctest --test-dir build -C Release --output-on-failure
 
       - name: auval (Audio Unit)
         run: |
+          mkdir -p "$HOME/Library/Audio/Plug-Ins/Components"
+          ditto "build/InfinatiKick_artefacts/Release/AU/Infinati Kick.component" "$HOME/Library/Audio/Plug-Ins/Components/Infinati Kick.component"
           killall -9 AudioComponentRegistrar || true
           auval -v aumu InKk Infn
 
@@ -36,19 +48,27 @@ jobs:
           $PV --strictness-level 10 --validate-in-process "build/InfinatiKick_artefacts/Release/VST3/Infinati Kick.vst3"
           $PV --strictness-level 10 --validate-in-process "$HOME/Library/Audio/Plug-Ins/Components/Infinati Kick.component"
 
-      - name: Package
+      - name: Bundle DMG and installer
+        shell: bash
         run: |
+          set -euo pipefail
           A=build/InfinatiKick_artefacts/Release
-          mkdir dist
+          mkdir -p dist
           for b in "$A/VST3/Infinati Kick.vst3" "$A/AU/Infinati Kick.component" "$A/Standalone/Infinati Kick.app"; do
+            test -d "$b"
             codesign --force --deep -s - "$b"
-            ditto -c -k --keepParent "$b" "dist/$(basename "$b").zip"
+            codesign --verify --deep --strict "$b"
+            ditto "$b" "dist/$(basename "$b")"
           done
+          cp install-macos.command dist/Install-InfinatiKick.command
+          chmod +x dist/Install-InfinatiKick.command
+          hdiutil create -volname "Infinati Kick" -srcfolder dist -ov -format UDZO InfinatiKick-macOS.dmg
 
       - uses: actions/upload-artifact@v4
         with:
           name: InfinatiKick-macOS
-          path: dist/*
+          if-no-files-found: error
+          path: InfinatiKick-macOS.dmg
 
   windows:
     runs-on: windows-latest
@@ -94,7 +114,7 @@ jobs:
         run: cmake --build build
 
       - name: Render tests
-        run: ctest --test-dir build --output-on-failure
+        run: xvfb-run -a ctest --test-dir build --output-on-failure
 
       - name: pluginval (VST3)
         run: |
