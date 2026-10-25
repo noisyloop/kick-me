@@ -3,7 +3,8 @@
 #include "PluginProcessor.h"
 #include <array>
 
-// Neon synthwave look: gradient knobs with glowing arcs, glossy pill buttons.
+// Analog hardware look: charcoal faceplate, cream knobs with knurled skirts,
+// one amber accent for the LED, readouts and preset display.
 class KickLookAndFeel : public juce::LookAndFeel_V4
 {
 public:
@@ -17,6 +18,12 @@ public:
                                bool isMouseOverButton, bool isButtonDown) override;
 
     juce::Font getTextButtonFont (juce::TextButton&, int buttonHeight) override;
+
+    void drawComboBox (juce::Graphics&, int width, int height, bool isButtonDown,
+                       int buttonX, int buttonY, int buttonW, int buttonH, juce::ComboBox&) override;
+
+    juce::Font getComboBoxFont (juce::ComboBox&) override;
+    juce::Font getPopupMenuFont() override;
 };
 
 class KickEditor : public juce::AudioProcessorEditor, private juce::Timer
@@ -43,9 +50,10 @@ private:
     std::array<Knob, 7> knobs;
     juce::TextButton triggerButton { "TRIGGER" };
     juce::TextButton randomButton { "RANDOMIZE" };
+    juce::ComboBox presetBox;
 
-    juce::Rectangle<int> panel;
-    float pulse = 0.0f; // follows the output level so the scene throbs with each kick
+    juce::Rectangle<int> header, panel, led;
+    float pulse = 0.0f; // follows the output level and lights the LED on each hit
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (KickEditor)
 };

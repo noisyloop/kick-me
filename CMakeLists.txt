@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(InfinatiKick VERSION 0.2.0)
+project(KickMe VERSION 0.3.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-option(INFINATI_COPY_PLUGIN "Copy the built plugin into the system plug-in folder" OFF)
-option(INFINATI_BUILD_TESTS "Build the offline render tests" ON)
+option(KICKME_COPY_PLUGIN "Copy the built plugin into the system plug-in folder" OFF)
+option(KICKME_BUILD_TESTS "Build the offline render tests" ON)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -17,37 +17,37 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(juce)
 
-set(INFINATI_FORMATS VST3 Standalone)
+set(KICKME_FORMATS VST3 Standalone)
 if (APPLE)
-    list(APPEND INFINATI_FORMATS AU)
+    list(APPEND KICKME_FORMATS AU)
 endif()
 
-juce_add_plugin(InfinatiKick
+juce_add_plugin(KickMe
     COMPANY_NAME "Infinati"
     PLUGIN_MANUFACTURER_CODE Infn
     PLUGIN_CODE InKk
-    FORMATS ${INFINATI_FORMATS}
+    FORMATS ${KICKME_FORMATS}
     VST3_CATEGORIES Instrument Drum
-    PRODUCT_NAME "InfinatiKick"
-    PLUGIN_NAME "Infinati Kick"
+    PRODUCT_NAME "KickMe"
+    PLUGIN_NAME "Kick Me"
     IS_SYNTH TRUE
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT FALSE
-    COPY_PLUGIN_AFTER_BUILD ${INFINATI_COPY_PLUGIN}
+    COPY_PLUGIN_AFTER_BUILD ${KICKME_COPY_PLUGIN}
 )
 
-target_sources(InfinatiKick PRIVATE
+target_sources(KickMe PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
 )
 
-target_compile_definitions(InfinatiKick PUBLIC
+target_compile_definitions(KickMe PUBLIC
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0
 )
 
-target_link_libraries(InfinatiKick
+target_link_libraries(KickMe
     PRIVATE
         juce::juce_audio_utils
     PUBLIC
@@ -56,16 +56,16 @@ target_link_libraries(InfinatiKick
         juce::juce_recommended_warning_flags
 )
 
-if (INFINATI_BUILD_TESTS)
+if (KICKME_BUILD_TESTS)
     enable_testing()
 
-    add_executable(InfinatiKickTests Tests/RenderTests.cpp)
-    target_include_directories(InfinatiKickTests PRIVATE
+    add_executable(KickMeTests Tests/RenderTests.cpp)
+    target_include_directories(KickMeTests PRIVATE
         Source
-        $<TARGET_PROPERTY:InfinatiKick,INCLUDE_DIRECTORIES>)
-    target_compile_definitions(InfinatiKickTests PRIVATE
-        $<TARGET_PROPERTY:InfinatiKick,COMPILE_DEFINITIONS>)
-    target_link_libraries(InfinatiKickTests PRIVATE InfinatiKick)
+        $<TARGET_PROPERTY:KickMe,INCLUDE_DIRECTORIES>)
+    target_compile_definitions(KickMeTests PRIVATE
+        $<TARGET_PROPERTY:KickMe,COMPILE_DEFINITIONS>)
+    target_link_libraries(KickMeTests PRIVATE KickMe)
 
-    add_test(NAME render COMMAND InfinatiKickTests)
+    add_test(NAME render COMMAND KickMeTests)
 endif()

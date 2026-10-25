@@ -22,11 +22,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: build/_deps/juce-src
-          key: infinatikick-juce-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
+          key: kickme-juce-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
 
       - name: Configure (universal arm64 + x86_64)
         run: >
-          cmake -S . -B build -G Xcode -DINFINATI_COPY_PLUGIN=OFF
+          cmake -S . -B build -G Xcode -DKICKME_COPY_PLUGIN=OFF
           -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
           -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
 
@@ -39,7 +39,7 @@ jobs:
       - name: auval (Audio Unit)
         run: |
           mkdir -p "$HOME/Library/Audio/Plug-Ins/Components"
-          ditto build/InfinatiKick_artefacts/Release/AU/InfinatiKick.component "$HOME/Library/Audio/Plug-Ins/Components/InfinatiKick.component"
+          ditto build/KickMe_artefacts/Release/AU/KickMe.component "$HOME/Library/Audio/Plug-Ins/Components/KickMe.component"
           killall -9 AudioComponentRegistrar || true
           auval -v aumu InKk Infn
 
@@ -48,72 +48,72 @@ jobs:
           curl -sSLf -o pluginval.zip https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_macOS.zip
           unzip -q pluginval.zip
           PV=pluginval.app/Contents/MacOS/pluginval
-          $PV --strictness-level 10 --validate-in-process build/InfinatiKick_artefacts/Release/VST3/InfinatiKick.vst3
-          $PV --strictness-level 10 --validate-in-process "$HOME/Library/Audio/Plug-Ins/Components/InfinatiKick.component"
+          $PV --strictness-level 10 --validate-in-process build/KickMe_artefacts/Release/VST3/KickMe.vst3
+          $PV --strictness-level 10 --validate-in-process "$HOME/Library/Audio/Plug-Ins/Components/KickMe.component"
 
       - name: Bundle DMG and installer
         shell: bash
         run: |
           set -euo pipefail
-          A=build/InfinatiKick_artefacts/Release
+          A=build/KickMe_artefacts/Release
           S=dmg-stage
           mkdir -p "$S" dist
-          for b in "$A/VST3/InfinatiKick.vst3" "$A/AU/InfinatiKick.component" "$A/Standalone/InfinatiKick.app"; do
+          for b in "$A/VST3/KickMe.vst3" "$A/AU/KickMe.component" "$A/Standalone/KickMe.app"; do
             test -d "$b"
             codesign --force --deep -s - "$b"
             codesign --verify --deep --strict "$b"
             ditto "$b" "$S/$(basename "$b")"
           done
-          cp install-macos.command "$S/Install-InfinatiKick.command"
-          chmod +x "$S/Install-InfinatiKick.command"
+          cp install-macos.command "$S/Install-KickMe.command"
+          chmod +x "$S/Install-KickMe.command"
           cat > "$S/Install.txt" <<'TXT'
-          Infinati Kick
+          Kick Me
 
-          Quit Ableton Live, then double-click Install-InfinatiKick.command.
+          Quit Ableton Live, then double-click Install-KickMe.command.
 
           If macOS blocks it, paste this into Terminal instead (with this disk image open).
-          It copies InfinatiKick.vst3 to ~/Library/Audio/Plug-Ins/VST3 and clears the
+          It copies KickMe.vst3 to ~/Library/Audio/Plug-Ins/VST3 and clears the
           download quarantine in one go:
 
-          V=~/Library/Audio/Plug-Ins/VST3; mkdir -p "$V" && rm -rf "$V/InfinatiKick.vst3" "$V/Infinati Kick.vst3" && ditto /Volumes/InfinatiKick/InfinatiKick.vst3 "$V/InfinatiKick.vst3" && xattr -cr "$V/InfinatiKick.vst3" && echo "Infinati Kick installed"
+          V=~/Library/Audio/Plug-Ins/VST3; mkdir -p "$V" && rm -rf "$V/KickMe.vst3" "$V/InfinatiKick.vst3" "$V/Infinati Kick.vst3" && ditto /Volumes/KickMe/KickMe.vst3 "$V/KickMe.vst3" && xattr -cr "$V/KickMe.vst3" && echo "Kick Me installed"
 
           Then in Ableton Live: Preferences > Plug-Ins > Rescan, and load
-          "Infinati Kick" from Plug-Ins > Instruments on a MIDI track.
+          "Kick Me" from Plug-Ins > Instruments on a MIDI track.
           TXT
-          hdiutil create -volname InfinatiKick -srcfolder "$S" -fs HFS+ -format UDZO -ov dist/InfinatiKick.dmg
-          codesign --force -s - dist/InfinatiKick.dmg
-          hdiutil verify dist/InfinatiKick.dmg
+          hdiutil create -volname KickMe -srcfolder "$S" -fs HFS+ -format UDZO -ov dist/KickMe.dmg
+          codesign --force -s - dist/KickMe.dmg
+          hdiutil verify dist/KickMe.dmg
 
       - name: Check DMG installers
         shell: bash
         run: |
           set -euo pipefail
-          hdiutil attach -nobrowse dist/InfinatiKick.dmg
-          printf '\n\n' | /Volumes/InfinatiKick/Install-InfinatiKick.command
-          V=~/Library/Audio/Plug-Ins/VST3; mkdir -p "$V" && rm -rf "$V/InfinatiKick.vst3" "$V/Infinati Kick.vst3" && ditto /Volumes/InfinatiKick/InfinatiKick.vst3 "$V/InfinatiKick.vst3" && xattr -cr "$V/InfinatiKick.vst3" && echo "Infinati Kick installed"
-          hdiutil detach /Volumes/InfinatiKick
-          test -f "$V/InfinatiKick.vst3/Contents/MacOS/InfinatiKick"
-          test -d "$HOME/Library/Audio/Plug-Ins/Components/InfinatiKick.component"
-          test -d "$HOME/Applications/InfinatiKick.app"
-          codesign --verify --deep "$V/InfinatiKick.vst3"
+          hdiutil attach -nobrowse dist/KickMe.dmg
+          printf '\n\n' | /Volumes/KickMe/Install-KickMe.command
+          V=~/Library/Audio/Plug-Ins/VST3; mkdir -p "$V" && rm -rf "$V/KickMe.vst3" "$V/InfinatiKick.vst3" "$V/Infinati Kick.vst3" && ditto /Volumes/KickMe/KickMe.vst3 "$V/KickMe.vst3" && xattr -cr "$V/KickMe.vst3" && echo "Kick Me installed"
+          hdiutil detach /Volumes/KickMe
+          test -f "$V/KickMe.vst3/Contents/MacOS/KickMe"
+          test -d "$HOME/Library/Audio/Plug-Ins/Components/KickMe.component"
+          test -d "$HOME/Applications/KickMe.app"
+          codesign --verify --deep "$V/KickMe.vst3"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: InfinatiKick-macOS
+          name: KickMe-macOS
           if-no-files-found: error
-          path: dist/InfinatiKick.dmg
+          path: dist/KickMe.dmg
 
       - name: Publish release
         if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION=$(sed -n 's/^project(InfinatiKick VERSION \(.*\))/\1/p' CMakeLists.txt)
+          VERSION=$(sed -n 's/^project(KickMe VERSION \(.*\))/\1/p' CMakeLists.txt)
           TAG="v$VERSION"
           gh release view "$TAG" > /dev/null 2>&1 || \
-            gh release create "$TAG" --target "$GITHUB_SHA" --title "Infinati Kick $VERSION" \
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "Kick Me $VERSION" \
               --notes "macOS (Apple Silicon + Intel). Open the DMG and follow Install.txt."
-          gh release upload "$TAG" dist/InfinatiKick.dmg --clobber
+          gh release upload "$TAG" dist/KickMe.dmg --clobber
 
   windows:
     runs-on: windows-latest
@@ -121,7 +121,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Configure
-        run: cmake -B build -DINFINATI_COPY_PLUGIN=OFF
+        run: cmake -B build -DKICKME_COPY_PLUGIN=OFF
 
       - name: Build
         run: cmake --build build --config Release -j 4
@@ -134,7 +134,7 @@ jobs:
         run: |
           curl -sSLf -o pluginval.zip https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Windows.zip
           unzip -q pluginval.zip
-          ./pluginval.exe --strictness-level 10 --validate-in-process build/InfinatiKick_artefacts/Release/VST3/InfinatiKick.vst3
+          ./pluginval.exe --strictness-level 10 --validate-in-process build/KickMe_artefacts/Release/VST3/KickMe.vst3
 
   linux:
     runs-on: ubuntu-24.04
@@ -148,7 +148,7 @@ jobs:
             libx11-dev libxext-dev libxrandr-dev libxinerama-dev libxcursor-dev libgl1-mesa-dev xvfb
 
       - name: Configure
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DINFINATI_COPY_PLUGIN=OFF
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DKICKME_COPY_PLUGIN=OFF
 
       - name: Build
         run: cmake --build build
@@ -160,4 +160,4 @@ jobs:
         run: |
           curl -sSLf -o pluginval.zip https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Linux.zip
           unzip -q pluginval.zip
-          xvfb-run -a ./pluginval --strictness-level 10 --validate-in-process build/InfinatiKick_artefacts/Release/VST3/InfinatiKick.vst3
+          xvfb-run -a ./pluginval --strictness-level 10 --validate-in-process build/KickMe_artefacts/Release/VST3/KickMe.vst3

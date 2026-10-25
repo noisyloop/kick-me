@@ -194,6 +194,35 @@ int main()
         check (peak (x) > 0.1f, "randomize plays a hit");
     }
 
+    {
+        KickProcessor p;
+        check (p.getNumPrograms() >= 10 && p.getProgramName (1) == "808", "factory presets include an 808");
+
+        bool allOk = true;
+        for (int i = 0; i < p.getNumPrograms(); ++i)
+        {
+            p.setCurrentProgram (i);
+            auto x = render (p, 48000, { { 0, 1.0f } });
+            const bool ok = allFinite (x) && peak (x) <= 1.0f && peak (x) > 0.2f;
+            if (! ok)
+                std::printf ("      preset %s: peak %.3f\n", p.getProgramName (i).toRawUTF8(), peak (x));
+            allOk = allOk && ok;
+        }
+        check (allOk, "every preset renders a loud, finite hit at or below 0 dBFS");
+
+        p.setCurrentProgram (1);
+        const float start = p.apvts.getRawParameterValue ("startHz")->load();
+        const float decay = p.apvts.getRawParameterValue ("ampDecay")->load();
+        check (p.getCurrentProgram() == 1 && std::abs (start - 120.0f) < 0.5f && std::abs (decay - 1200.0f) < 1.0f,
+               "selecting the 808 preset sets its values");
+
+        juce::MemoryBlock state;
+        p.getStateInformation (state);
+        KickProcessor q;
+        q.setStateInformation (state.getData(), (int) state.getSize());
+        check (q.getCurrentProgram() == 1, "selected preset survives save/restore");
+    }
+
     std::printf (failures == 0 ? "\nall tests passed\n" : "\n%d test(s) failed\n", failures);
     return failures == 0 ? 0 : 1;
 }
