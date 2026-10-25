@@ -10,6 +10,28 @@ namespace
     constexpr auto kClick      = "click";
     constexpr auto kDrive      = "drive";
     constexpr auto kLevel      = "level";
+
+    constexpr auto kPresetProperty = "preset";
+
+    struct Preset
+    {
+        const char* name;
+        float startHz, endHz, pitchDecay, ampDecay, click, drive, level;
+    };
+
+    const Preset presets[] = {
+        //  name            start   end  p.dec  a.dec  click  drive  level
+        { "Init",           220.0f, 48.0f, 45.0f,  420.0f, 0.25f, 0.30f, -3.0f },
+        { "808",            120.0f, 45.0f, 60.0f, 1200.0f, 0.05f, 0.10f, -3.0f },
+        { "Trap 808",       150.0f, 42.0f, 80.0f, 1800.0f, 0.08f, 0.55f, -4.0f },
+        { "Techno",         260.0f, 50.0f, 35.0f,  380.0f, 0.35f, 0.45f, -3.0f },
+        { "House",          200.0f, 52.0f, 40.0f,  320.0f, 0.25f, 0.20f, -3.0f },
+        { "Hardstyle",      520.0f, 55.0f, 25.0f,  450.0f, 0.45f, 0.95f, -5.0f },
+        { "Drum & Bass",    320.0f, 58.0f, 20.0f,  180.0f, 0.50f, 0.35f, -3.0f },
+        { "Boom Bap",       180.0f, 55.0f, 45.0f,  260.0f, 0.30f, 0.30f, -3.0f },
+        { "Psytrance",      380.0f, 48.0f, 15.0f,  220.0f, 0.60f, 0.40f, -3.0f },
+        { "Lo-fi",          150.0f, 50.0f, 50.0f,  300.0f, 0.05f, 0.15f, -6.0f },
+    };
 }
 
 KickProcessor::KickProcessor()
@@ -80,6 +102,44 @@ void KickProcessor::randomize()
     }
 
     uiTrigger = true;
+}
+
+int KickProcessor::getNumPrograms()
+{
+    return (int) std::size (presets);
+}
+
+int KickProcessor::getCurrentProgram()
+{
+    return currentPreset;
+}
+
+const juce::String KickProcessor::getProgramName (int index)
+{
+    return juce::isPositiveAndBelow (index, getNumPrograms()) ? presets[index].name : "";
+}
+
+void KickProcessor::setCurrentProgram (int index)
+{
+    if (! juce::isPositiveAndBelow (index, getNumPrograms()))
+        return;
+
+    const auto& p = presets[index];
+    const std::pair<const char*, float> values[] = {
+        { kStartHz, p.startHz }, { kEndHz, p.endHz }, { kPitchDecay, p.pitchDecay }, { kAmpDecay, p.ampDecay },
+        { kClick, p.click }, { kDrive, p.drive }, { kLevel, p.level },
+    };
+
+    for (const auto& [id, value] : values)
+    {
+        auto* param = apvts.getParameter (id);
+        param->beginChangeGesture();
+        param->setValueNotifyingHost (param->convertTo0to1 (value));
+        param->endChangeGesture();
+    }
+
+    currentPreset = index;
+    apvts.state.setProperty (kPresetProperty, index, nullptr);
 }
 
 void KickProcessor::prepareToPlay (double newSampleRate, int)
@@ -214,7 +274,10 @@ void KickProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     if (auto xml = getXmlFromBinary (data, sizeInBytes))
         if (xml->hasTagName (apvts.state.getType()))
+        {
             apvts.replaceState (juce::ValueTree::fromXml (*xml));
+            currentPreset = juce::jlimit (0, getNumPrograms() - 1, (int) apvts.state.getProperty (kPresetProperty, 0));
+        }
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()

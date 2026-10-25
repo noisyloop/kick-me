@@ -4,154 +4,189 @@ namespace
 {
     using juce::Colour;
 
-    const Colour cyan    { 0xff00f0ff };
-    const Colour violet  { 0xff7b2fff };
-    const Colour magenta { 0xffff00e5 };
-    const Colour hotPink { 0xffff2975 };
-    const Colour orange  { 0xffff8c00 };
-    const Colour yellow  { 0xffffd319 };
-    const Colour lime    { 0xff3dff8b };
+    const Colour amber      { 0xffffa634 };
+    const Colour faceTop    { 0xff2a2a2c };
+    const Colour faceBottom { 0xff18181a };
+    const Colour metalLight { 0xffc9c7c1 };
+    const Colour metalDark  { 0xff8f8d88 };
+    const Colour ink        { 0xff1b1b1c };
+    const Colour silkscreen { 0xffd8d3c7 };
+    const Colour cream      { 0xffece4d0 };
 
-    const Colour skyTop    { 0xff0d0221 };
-    const Colour skyBottom { 0xff3b0a5e };
+    struct KnobSpec { const char* id; const char* name; };
 
-    struct KnobSpec { const char* id; const char* name; Colour from, to; };
-
-    // Each knob hands the rainbow on to the next one
     const KnobSpec specs[] = {
-        { "startHz",    "START",   cyan,    violet  },
-        { "endHz",      "END",     violet,  magenta },
-        { "pitchDecay", "P.DECAY", magenta, hotPink },
-        { "ampDecay",   "A.DECAY", hotPink, orange  },
-        { "click",      "CLICK",   orange,  yellow  },
-        { "drive",      "DRIVE",   yellow,  lime    },
-        { "level",      "LEVEL",   lime,    cyan    },
+        { "startHz",    "START"   },
+        { "endHz",      "END"     },
+        { "pitchDecay", "P.DECAY" },
+        { "ampDecay",   "A.DECAY" },
+        { "click",      "CLICK"   },
+        { "drive",      "DRIVE"   },
+        { "level",      "LEVEL"   },
     };
+
+    // Faint horizontal streaks, like brushed metal
+    void drawBrushed (juce::Graphics& g, juce::Rectangle<float> area, float strength, int seed)
+    {
+        juce::Random r (seed);
+        for (float y = area.getY(); y < area.getBottom(); y += 1.0f)
+        {
+            const bool light = r.nextBool();
+            g.setColour ((light ? juce::Colours::white : juce::Colours::black).withAlpha (r.nextFloat() * strength));
+            g.drawHorizontalLine ((int) y, area.getX(), area.getRight());
+        }
+    }
+
+    void drawScrew (juce::Graphics& g, juce::Point<float> c)
+    {
+        const auto r = juce::Rectangle<float> (11.0f, 11.0f).withCentre (c);
+        g.setGradientFill (juce::ColourGradient (Colour (0xffd5d3ce), r.getX(), r.getY(),
+                                                 Colour (0xff6d6b67), r.getRight(), r.getBottom(), false));
+        g.fillEllipse (r);
+        g.setColour (juce::Colours::black.withAlpha (0.5f));
+        g.drawEllipse (r, 0.8f);
+        g.setColour (Colour (0xff3a3937));
+        g.drawLine (c.x - 3.5f, c.y + 2.0f, c.x + 3.5f, c.y - 2.0f, 1.4f);
+    }
 }
 
 //==============================================================================
 KickLookAndFeel::KickLookAndFeel()
 {
-    setColour (juce::Slider::textBoxTextColourId, juce::Colours::white);
-    setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
-    setColour (juce::Slider::textBoxBackgroundColourId, juce::Colours::black.withAlpha (0.35f));
-    setColour (juce::Slider::textBoxHighlightColourId, magenta.withAlpha (0.5f));
-    setColour (juce::TextButton::textColourOffId, juce::Colours::white);
-    setColour (juce::TextButton::textColourOnId, juce::Colours::white);
+    setColour (juce::Slider::textBoxTextColourId, amber);
+    setColour (juce::Slider::textBoxOutlineColourId, Colour (0xff3a3a3c));
+    setColour (juce::Slider::textBoxBackgroundColourId, Colour (0xff0c0c0d));
+    setColour (juce::Slider::textBoxHighlightColourId, amber.withAlpha (0.3f));
+    setColour (juce::TextButton::textColourOffId, silkscreen);
+    setColour (juce::TextButton::textColourOnId, amber);
+    setColour (juce::ComboBox::textColourId, amber);
+    setColour (juce::ComboBox::arrowColourId, amber);
+    setColour (juce::PopupMenu::backgroundColourId, Colour (0xff1c1c1e));
+    setColour (juce::PopupMenu::textColourId, silkscreen);
+    setColour (juce::PopupMenu::highlightedBackgroundColourId, amber.withAlpha (0.85f));
+    setColour (juce::PopupMenu::highlightedTextColourId, ink);
 }
 
 void KickLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int width, int height,
                                         float sliderPos, float rotaryStartAngle, float rotaryEndAngle,
-                                        juce::Slider& slider)
+                                        juce::Slider&)
 {
-    const auto bounds = juce::Rectangle<int> (x, y, width, height).toFloat().reduced (6.0f);
+    const auto bounds = juce::Rectangle<int> (x, y, width, height).toFloat().reduced (4.0f);
     const float radius = juce::jmin (bounds.getWidth(), bounds.getHeight()) * 0.5f;
     const auto centre = bounds.getCentre();
-    const float lineW = radius * 0.16f;
-    const float arcR = radius - lineW;
-    const float toAngle = rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle);
+    const float angle = rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle);
 
-    const auto from = slider.findColour (juce::Slider::rotarySliderFillColourId);
-    const auto to   = slider.findColour (juce::Slider::thumbColourId);
-
-    const juce::PathStrokeType stroke (lineW, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
-
-    juce::Path track;
-    track.addCentredArc (centre.x, centre.y, arcR, arcR, 0.0f, rotaryStartAngle, rotaryEndAngle, true);
-    g.setColour (juce::Colours::black.withAlpha (0.45f));
-    g.strokePath (track, stroke);
-
-    if (sliderPos > 0.0f)
+    // Scale ticks printed on the faceplate
+    const float tickOuter = radius;
+    const float tickInner = radius * 0.86f;
+    for (int i = 0; i <= 10; ++i)
     {
-        juce::Path arc;
-        arc.addCentredArc (centre.x, centre.y, arcR, arcR, 0.0f, rotaryStartAngle, toAngle, true);
-
-        g.setGradientFill (juce::ColourGradient (from, centre.x - radius, centre.y,
-                                                 to,   centre.x + radius, centre.y, false));
-
-        // Two soft passes for the glow, then the arc itself
-        g.setOpacity (0.15f);
-        g.strokePath (arc, juce::PathStrokeType (lineW * 2.8f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        g.setOpacity (0.3f);
-        g.strokePath (arc, juce::PathStrokeType (lineW * 1.8f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        g.setOpacity (1.0f);
-        g.strokePath (arc, stroke);
+        const float a = rotaryStartAngle + (float) i / 10.0f * (rotaryEndAngle - rotaryStartAngle);
+        const bool major = i % 5 == 0;
+        g.setColour (silkscreen.withAlpha (major ? 0.8f : 0.4f));
+        g.drawLine (juce::Line<float> (centre.getPointOnCircumference (major ? tickInner * 0.96f : tickInner, a),
+                                       centre.getPointOnCircumference (tickOuter, a)),
+                    major ? 1.6f : 1.0f);
     }
 
-    // Knob body: glossy candy ball
-    const float bodyR = arcR - lineW * 1.2f;
-    const auto body = juce::Rectangle<float> (bodyR * 2.0f, bodyR * 2.0f).withCentre (centre);
+    // Knurled skirt
+    const float skirtR = radius * 0.78f;
+    const auto skirt = juce::Rectangle<float> (skirtR * 2.0f, skirtR * 2.0f).withCentre (centre);
 
-    juce::Path bodyPath;
-    bodyPath.addEllipse (body);
-    juce::DropShadow (juce::Colours::black.withAlpha (0.7f), (int) (bodyR * 0.5f), { 0, (int) (bodyR * 0.2f) })
-        .drawForPath (g, bodyPath);
+    juce::Path skirtPath;
+    skirtPath.addEllipse (skirt);
+    juce::DropShadow (juce::Colours::black.withAlpha (0.75f), (int) (skirtR * 0.45f), { 0, (int) (skirtR * 0.18f) })
+        .drawForPath (g, skirtPath);
 
-    g.setGradientFill (juce::ColourGradient (from.interpolatedWith (juce::Colours::white, 0.3f),
-                                             centre.x - bodyR * 0.4f, centre.y - bodyR * 0.5f,
-                                             to.darker (1.2f), centre.x + bodyR * 0.7f, centre.y + bodyR, true));
-    g.fillEllipse (body);
+    g.setGradientFill (juce::ColourGradient (Colour (0xff4a4a4c), centre.x, skirt.getY(),
+                                             Colour (0xff141415), centre.x, skirt.getBottom(), false));
+    g.fillEllipse (skirt);
 
-    const auto gloss = body.reduced (bodyR * 0.18f, 0.0f).withHeight (bodyR * 0.95f).translated (0.0f, bodyR * 0.08f);
-    g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.45f), centre.x, gloss.getY(),
-                                             juce::Colours::white.withAlpha (0.0f), centre.x, gloss.getBottom(), false));
-    g.fillEllipse (gloss);
+    g.setColour (juce::Colours::black.withAlpha (0.55f));
+    for (int i = 0; i < 48; ++i)
+    {
+        const float a = angle + (float) i * juce::MathConstants<float>::twoPi / 48.0f;
+        g.drawLine (juce::Line<float> (centre.getPointOnCircumference (skirtR * 0.8f, a),
+                                       centre.getPointOnCircumference (skirtR * 0.98f, a)), 1.0f);
+    }
 
-    g.setColour (juce::Colours::white.withAlpha (0.4f));
-    g.drawEllipse (body, 1.2f);
+    // Cream cap with a soft top light
+    const float capR = skirtR * 0.72f;
+    const auto cap = juce::Rectangle<float> (capR * 2.0f, capR * 2.0f).withCentre (centre);
 
-    juce::Path pointer;
-    pointer.addRoundedRectangle (-lineW * 0.3f, -bodyR * 0.9f, lineW * 0.6f, bodyR * 0.5f, lineW * 0.3f);
-    g.setColour (juce::Colours::white);
-    g.fillPath (pointer, juce::AffineTransform::rotation (toAngle).translated (centre.x, centre.y));
+    g.setGradientFill (juce::ColourGradient (cream.brighter (0.15f), centre.x - capR * 0.35f, centre.y - capR * 0.6f,
+                                             cream.darker (0.45f), centre.x + capR * 0.5f, centre.y + capR, true));
+    g.fillEllipse (cap);
+    g.setColour (juce::Colours::black.withAlpha (0.35f));
+    g.drawEllipse (cap, 1.0f);
+    g.setColour (juce::Colours::white.withAlpha (0.35f));
+    g.drawEllipse (cap.reduced (1.2f), 0.8f);
 
-    // Glowing bead at the end of the arc
-    const auto end = centre.getPointOnCircumference (arcR, toAngle);
-    g.setColour (to.withAlpha (0.55f));
-    g.fillEllipse (juce::Rectangle<float> (lineW * 2.4f, lineW * 2.4f).withCentre (end));
-    g.setColour (juce::Colours::white);
-    g.fillEllipse (juce::Rectangle<float> (lineW * 1.1f, lineW * 1.1f).withCentre (end));
+    // Engraved pointer line from the cap out across the skirt
+    const auto inner = centre.getPointOnCircumference (capR * 0.25f, angle);
+    const auto outer = centre.getPointOnCircumference (skirtR * 0.95f, angle);
+    g.setColour (ink);
+    g.drawLine (juce::Line<float> (inner, outer), 2.6f);
 }
 
 void KickLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& button, const juce::Colour&,
                                             bool isMouseOverButton, bool isButtonDown)
 {
-    const auto b = button.getLocalBounds().toFloat().reduced (8.0f);
-    const float corner = b.getHeight() * 0.5f;
+    const auto b = button.getLocalBounds().toFloat().reduced (4.0f);
+    const float corner = 6.0f;
 
-    auto from = button.findColour (juce::TextButton::buttonColourId);
-    auto to   = button.findColour (juce::TextButton::buttonOnColourId);
+    juce::Path cap;
+    cap.addRoundedRectangle (b, corner);
 
-    if (isButtonDown)
+    if (! isButtonDown)
+        juce::DropShadow (juce::Colours::black.withAlpha (0.7f), 8, { 0, 3 }).drawForPath (g, cap);
+
+    const auto top    = Colour (isButtonDown ? 0xff252527 : (isMouseOverButton ? 0xff47474a : 0xff3d3d40));
+    const auto bottom = Colour (isButtonDown ? 0xff2e2e31 : 0xff222224);
+    g.setGradientFill (juce::ColourGradient (top, 0.0f, b.getY(), bottom, 0.0f, b.getBottom(), false));
+    g.fillPath (cap);
+
+    g.setColour (juce::Colours::black.withAlpha (0.8f));
+    g.strokePath (cap, juce::PathStrokeType (1.0f));
+
+    if (! isButtonDown)
     {
-        from = from.darker (0.3f);
-        to   = to.darker (0.3f);
+        g.setColour (juce::Colours::white.withAlpha (0.14f));
+        g.drawHorizontalLine ((int) b.getY() + 1, b.getX() + corner, b.getRight() - corner);
     }
-    else if (isMouseOverButton)
-    {
-        from = from.brighter (0.25f);
-        to   = to.brighter (0.25f);
-    }
-
-    juce::Path pill;
-    pill.addRoundedRectangle (b, corner);
-    juce::DropShadow (to.withAlpha (isMouseOverButton ? 0.95f : 0.65f), 16, {}).drawForPath (g, pill);
-
-    g.setGradientFill (juce::ColourGradient (from, b.getX(), b.getY(), to, b.getRight(), b.getBottom(), false));
-    g.fillPath (pill);
-
-    const auto shine = b.reduced (corner * 0.5f, 2.0f).withHeight (b.getHeight() * 0.45f);
-    g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.5f), 0.0f, shine.getY(),
-                                             juce::Colours::white.withAlpha (0.0f), 0.0f, shine.getBottom(), false));
-    g.fillRoundedRectangle (shine, shine.getHeight() * 0.5f);
-
-    g.setColour (juce::Colours::white.withAlpha (0.7f));
-    g.strokePath (pill, juce::PathStrokeType (1.3f));
 }
 
 juce::Font KickLookAndFeel::getTextButtonFont (juce::TextButton&, int)
 {
-    return juce::Font (juce::FontOptions (17.0f, juce::Font::bold));
+    return juce::Font (juce::FontOptions (13.0f, juce::Font::bold)).withExtraKerningFactor (0.12f);
+}
+
+void KickLookAndFeel::drawComboBox (juce::Graphics& g, int width, int height, bool,
+                                    int, int, int, int, juce::ComboBox& box)
+{
+    const auto b = juce::Rectangle<float> ((float) width, (float) height).reduced (0.5f);
+    g.setColour (Colour (0xff0c0c0d));
+    g.fillRoundedRectangle (b, 4.0f);
+    g.setColour (juce::Colours::black);
+    g.drawRoundedRectangle (b, 4.0f, 1.0f);
+    g.setColour (juce::Colours::white.withAlpha (0.12f));
+    g.drawHorizontalLine ((int) b.getBottom() - 1, b.getX() + 4.0f, b.getRight() - 4.0f);
+
+    juce::Path arrow;
+    const float ax = b.getRight() - 16.0f, ay = b.getCentreY();
+    arrow.addTriangle (ax - 4.0f, ay - 2.0f, ax + 4.0f, ay - 2.0f, ax, ay + 3.0f);
+    g.setColour (box.findColour (juce::ComboBox::arrowColourId));
+    g.fillPath (arrow);
+}
+
+juce::Font KickLookAndFeel::getComboBoxFont (juce::ComboBox&)
+{
+    return juce::Font (juce::FontOptions (14.0f, juce::Font::bold));
+}
+
+juce::Font KickLookAndFeel::getPopupMenuFont()
+{
+    return juce::Font (juce::FontOptions (14.0f));
 }
 
 //==============================================================================
@@ -165,30 +200,37 @@ KickEditor::KickEditor (KickProcessor& p)
         auto& k = knobs[i];
 
         k.slider.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
-        k.slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 78, 20);
-        k.slider.setColour (juce::Slider::rotarySliderFillColourId, specs[i].from);
-        k.slider.setColour (juce::Slider::thumbColourId, specs[i].to);
+        k.slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 74, 20);
+        for (auto id : { juce::Slider::textBoxTextColourId, juce::Slider::textBoxOutlineColourId,
+                         juce::Slider::textBoxBackgroundColourId, juce::Slider::textBoxHighlightColourId })
+            k.slider.setColour (id, lnf.findColour (id));
         addAndMakeVisible (k.slider);
 
         k.label.setText (specs[i].name, juce::dontSendNotification);
         k.label.setJustificationType (juce::Justification::centred);
-        k.label.setColour (juce::Label::textColourId, specs[i].from.interpolatedWith (juce::Colours::white, 0.4f));
-        k.label.setFont (juce::FontOptions (13.0f, juce::Font::bold));
+        k.label.setColour (juce::Label::textColourId, silkscreen);
+        k.label.setFont (juce::Font (juce::FontOptions (11.5f, juce::Font::bold)).withExtraKerningFactor (0.15f));
         addAndMakeVisible (k.label);
 
         k.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
             processor.apvts, specs[i].id, k.slider);
     }
 
-    triggerButton.setColour (juce::TextButton::buttonColourId, hotPink);
-    triggerButton.setColour (juce::TextButton::buttonOnColourId, orange);
     triggerButton.onClick = [this] { processor.uiTrigger = true; };
     addAndMakeVisible (triggerButton);
 
-    randomButton.setColour (juce::TextButton::buttonColourId, cyan);
-    randomButton.setColour (juce::TextButton::buttonOnColourId, violet);
     randomButton.onClick = [this] { processor.randomize(); };
     addAndMakeVisible (randomButton);
+
+    for (int i = 0; i < processor.getNumPrograms(); ++i)
+        presetBox.addItem (processor.getProgramName (i), i + 1);
+    presetBox.setSelectedId (processor.getCurrentProgram() + 1, juce::dontSendNotification);
+    presetBox.onChange = [this]
+    {
+        processor.setCurrentProgram (presetBox.getSelectedId() - 1);
+        processor.uiTrigger = true;
+    };
+    addAndMakeVisible (presetBox);
 
     setSize (760, 420);
     startTimerHz (30);
@@ -201,134 +243,123 @@ KickEditor::~KickEditor()
 
 void KickEditor::timerCallback()
 {
-    float next = juce::jmax (processor.outputPeak.load(), pulse * 0.88f);
-    if (next < 0.003f)
+    // The host can change programs too; keep the display in step
+    const int id = processor.getCurrentProgram() + 1;
+    if (presetBox.getSelectedId() != id)
+        presetBox.setSelectedId (id, juce::dontSendNotification);
+
+    float next = juce::jmax (processor.outputPeak.load(), pulse * 0.8f);
+    if (next < 0.01f)
         next = 0.0f;
 
-    if (std::abs (next - pulse) > 1.0e-4f)
+    if (std::abs (next - pulse) > 1.0e-3f)
     {
         pulse = next;
-        repaint();
+        repaint (led.expanded (12));
     }
 }
 
 void KickEditor::paint (juce::Graphics& g)
 {
-    const auto w = (float) getWidth();
-    const auto h = (float) getHeight();
-    const float horizon = h * 0.72f;
-    const float glow = juce::jlimit (0.0f, 1.0f, pulse);
+    const auto bounds = getLocalBounds().toFloat();
 
-    // Sky
-    const juce::ColourGradient sky (skyTop, 0.0f, 0.0f, skyBottom, 0.0f, horizon, false);
-    g.setGradientFill (sky);
-    g.fillRect (0.0f, 0.0f, w, horizon);
+    // Charcoal faceplate
+    g.setGradientFill (juce::ColourGradient (faceTop, 0.0f, 0.0f, faceBottom, 0.0f, bounds.getBottom(), false));
+    g.fillAll();
+    drawBrushed (g, bounds, 0.035f, 7);
 
-    juce::Random stars (4242);
-    for (int i = 0; i < 80; ++i)
+    // Brushed aluminium header strip with engraved name
+    const auto hf = header.toFloat();
+    g.setGradientFill (juce::ColourGradient (metalLight, 0.0f, hf.getY(), metalDark, 0.0f, hf.getBottom(), false));
+    g.fillRect (hf);
+    drawBrushed (g, hf, 0.08f, 11);
+    g.setColour (juce::Colours::white.withAlpha (0.5f));
+    g.drawHorizontalLine ((int) hf.getY(), hf.getX(), hf.getRight());
+    g.setColour (juce::Colours::black.withAlpha (0.6f));
+    g.drawHorizontalLine ((int) hf.getBottom(), hf.getX(), hf.getRight());
+
+    const auto titleFont = juce::Font (juce::FontOptions (30.0f, juce::Font::bold)).withExtraKerningFactor (0.18f);
+    const auto titleArea = hf.withTrimmedLeft (34.0f).withWidth (260.0f);
+    g.setFont (titleFont);
+    g.setColour (juce::Colours::white.withAlpha (0.55f));
+    g.drawText ("KICK ME", titleArea.translated (0.0f, 1.0f), juce::Justification::centredLeft);
+    g.setColour (ink);
+    g.drawText ("KICK ME", titleArea, juce::Justification::centredLeft);
+
+    g.setFont (juce::Font (juce::FontOptions (10.5f, juce::Font::bold)).withExtraKerningFactor (0.2f));
+    g.setColour (ink.withAlpha (0.7f));
+    g.drawText ("KICK DRUM SYNTHESIZER", hf.withTrimmedLeft (200.0f).withWidth (200.0f), juce::Justification::centredLeft);
+
+    g.drawText ("PRESET", presetBox.getBounds().toFloat().translated (-64.0f, 0.0f).withWidth (56.0f),
+                juce::Justification::centredRight);
+
+    // Hit LED: dark red-orange glass when idle, glowing amber on each kick
+    const auto lf = led.toFloat();
+    const float glow = juce::jlimit (0.0f, 1.0f, pulse * 1.6f);
+    if (glow > 0.0f)
     {
-        const float sx = stars.nextFloat() * w;
-        const float sy = stars.nextFloat() * horizon * 0.85f;
-        const float size = 0.6f + stars.nextFloat() * 1.8f;
-        g.setColour (juce::Colours::white.withAlpha (0.2f + stars.nextFloat() * 0.7f));
-        g.fillEllipse (sx, sy, size, size);
+        g.setGradientFill (juce::ColourGradient (amber.withAlpha (0.6f * glow), lf.getCentreX(), lf.getCentreY(),
+                                                 amber.withAlpha (0.0f), lf.getCentreX() + lf.getWidth() * 1.4f, lf.getCentreY(), true));
+        g.fillEllipse (lf.expanded (lf.getWidth() * 1.2f));
     }
+    g.setColour (juce::Colours::black.withAlpha (0.6f));
+    g.fillEllipse (lf.expanded (1.5f));
+    g.setGradientFill (juce::ColourGradient (Colour (0xff3a1d05).interpolatedWith (amber.brighter (0.4f), glow),
+                                             lf.getCentreX() - 2.0f, lf.getCentreY() - 2.0f,
+                                             Colour (0xff1e0f03).interpolatedWith (amber.darker (0.3f), glow),
+                                             lf.getRight(), lf.getBottom(), true));
+    g.fillEllipse (lf);
+    g.setColour (juce::Colours::white.withAlpha (0.35f));
+    g.fillEllipse (lf.reduced (lf.getWidth() * 0.3f).translated (-1.0f, -1.5f).withHeight (lf.getHeight() * 0.25f));
 
-    // The sun throbs with every kick
-    const float sunR = h * 0.36f * (1.0f + 0.12f * glow);
-    const juce::Point<float> sunCentre (w * 0.5f, horizon - h * 0.08f);
-
-    g.setGradientFill (juce::ColourGradient (hotPink.withAlpha (0.35f + 0.35f * glow), sunCentre.x, sunCentre.y,
-                                             hotPink.withAlpha (0.0f), sunCentre.x + sunR * 1.9f, sunCentre.y, true));
-    g.fillEllipse (juce::Rectangle<float> (sunR * 3.8f, sunR * 3.8f).withCentre (sunCentre));
-
-    juce::ColourGradient sun (yellow, sunCentre.x, sunCentre.y - sunR, violet, sunCentre.x, sunCentre.y + sunR, false);
-    sun.addColour (0.5, hotPink);
-    g.setGradientFill (sun);
-    g.setOpacity (0.6f + 0.4f * glow);
-    g.fillEllipse (juce::Rectangle<float> (sunR * 2.0f, sunR * 2.0f).withCentre (sunCentre));
-    g.setOpacity (1.0f);
-
-    // Retro stripes cut through the lower half of the sun
-    g.setGradientFill (sky);
-    for (int i = 0; i < 6; ++i)
-    {
-        const float sy = sunCentre.y + sunR * (0.1f + 0.16f * (float) i);
-        const float thickness = 1.5f + 1.6f * (float) i;
-        g.fillRect (sunCentre.x - sunR, sy, sunR * 2.0f, thickness);
-    }
-
-    // Ground and perspective grid
-    g.setGradientFill (juce::ColourGradient (Colour (0xff1a0033), 0.0f, horizon, juce::Colours::black, 0.0f, h, false));
-    g.fillRect (0.0f, horizon, w, h - horizon);
-
-    g.setColour (magenta.withAlpha (0.4f + 0.5f * glow));
-    for (int i = 1; i <= 9; ++i)
-    {
-        const float t = (float) i / 9.0f;
-        g.drawHorizontalLine ((int) (horizon + (h - horizon) * t * t), 0.0f, w);
-    }
-    for (int i = -14; i <= 14; ++i)
-        g.drawLine (w * 0.5f + (float) i * w * 0.012f, horizon, w * 0.5f + (float) i * w * 0.11f, h, 1.0f);
-
-    g.setColour (cyan.withAlpha (0.8f));
-    g.fillRect (0.0f, horizon - 1.0f, w, 2.0f);
-
-    // Title: chrome-ish gradient letters with a hot pink drop
-    juce::GlyphArrangement title;
-    title.addLineOfText (juce::Font (juce::FontOptions (42.0f, juce::Font::bold | juce::Font::italic)),
-                         "INFINATI KICK", 24.0f, 54.0f);
-    juce::Path titlePath;
-    title.createPath (titlePath);
-    const auto tb = titlePath.getBounds();
-
-    g.setColour (magenta.withAlpha (0.75f));
-    g.fillPath (titlePath, juce::AffineTransform::translation (4.0f, 4.0f));
-
-    juce::ColourGradient chrome (cyan, tb.getX(), tb.getY(), yellow, tb.getRight(), tb.getBottom(), false);
-    chrome.addColour (0.5, juce::Colours::white);
-    g.setGradientFill (chrome);
-    g.fillPath (titlePath);
-    g.setColour (juce::Colours::white.withAlpha (0.6f + 0.4f * glow));
-    g.strokePath (titlePath, juce::PathStrokeType (1.0f));
-
-    g.setFont (juce::FontOptions (12.0f, juce::Font::bold));
-    g.setColour (cyan);
-    g.drawText ("/// MAXIMUM KICK TECHNOLOGY ///", getWidth() - 300, 20, 280, 18, juce::Justification::centredRight);
-    g.setColour (juce::Colours::white.withAlpha (0.6f));
-    g.drawText ("play any MIDI note", getWidth() - 300, 38, 280, 18, juce::Justification::centredRight);
-
-    // Frosted glass panel behind the knobs
+    // Recessed control panel
     const auto pf = panel.toFloat();
-    g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.16f), 0.0f, pf.getY(),
-                                             juce::Colours::white.withAlpha (0.04f), 0.0f, pf.getBottom(), false));
-    g.fillRoundedRectangle (pf, 20.0f);
+    g.setColour (juce::Colours::black.withAlpha (0.35f));
+    g.fillRoundedRectangle (pf, 8.0f);
+    g.setColour (juce::Colours::black.withAlpha (0.7f));
+    g.drawRoundedRectangle (pf, 8.0f, 1.2f);
+    g.setColour (juce::Colours::white.withAlpha (0.07f));
+    g.drawHorizontalLine ((int) pf.getBottom() + 1, pf.getX() + 8.0f, pf.getRight() - 8.0f);
 
-    juce::ColourGradient rim (cyan, pf.getX(), 0.0f, magenta, pf.getRight(), 0.0f, false);
-    rim.addColour (0.5, yellow);
-    g.setGradientFill (rim);
-    g.setOpacity (0.55f + 0.45f * glow);
-    g.drawRoundedRectangle (pf, 20.0f, 1.6f);
-    g.setOpacity (1.0f);
+    // Divider between pitch and tone sections
+    const float colW = (float) panel.reduced (8, 0).getWidth() / (float) knobs.size();
+    const float divX = (float) panel.getX() + 8.0f + colW * 4.0f;
+    g.setColour (juce::Colours::black.withAlpha (0.6f));
+    g.drawVerticalLine ((int) divX, pf.getY() + 18.0f, pf.getBottom() - 18.0f);
+    g.setColour (juce::Colours::white.withAlpha (0.06f));
+    g.drawVerticalLine ((int) divX + 1, pf.getY() + 18.0f, pf.getBottom() - 18.0f);
+
+    for (auto c : { juce::Point<float> (14.0f, 14.0f), juce::Point<float> (bounds.getRight() - 14.0f, 14.0f),
+                    juce::Point<float> (14.0f, bounds.getBottom() - 14.0f),
+                    juce::Point<float> (bounds.getRight() - 14.0f, bounds.getBottom() - 14.0f) })
+        drawScrew (g, c);
 }
 
 void KickEditor::resized()
 {
-    auto area = getLocalBounds().reduced (20);
-    area.removeFromTop (60);
+    auto area = getLocalBounds();
 
-    auto buttons = area.removeFromBottom (62).withSizeKeepingCentre (420, 58);
-    triggerButton.setBounds (buttons.removeFromLeft (200));
-    randomButton.setBounds (buttons.removeFromRight (200));
+    header = area.removeFromTop (64).reduced (28, 8);
+    auto hb = header.reduced (12, 0);
+    led = hb.removeFromRight (14).withSizeKeepingCentre (12, 12);
+    hb.removeFromRight (14);
+    presetBox.setBounds (hb.removeFromRight (180).withSizeKeepingCentre (180, 28));
 
-    panel = area.reduced (0, 6);
+    area.reduce (28, 0);
+    area.removeFromTop (14);
 
-    auto inner = panel.reduced (8, 12);
+    auto buttons = area.removeFromBottom (70).withSizeKeepingCentre (360, 46);
+    triggerButton.setBounds (buttons.removeFromLeft (170));
+    randomButton.setBounds (buttons.removeFromRight (170));
+
+    panel = area;
+
+    auto inner = panel.reduced (8, 14);
     const int w = inner.getWidth() / (int) knobs.size();
     for (auto& k : knobs)
     {
         auto col = inner.removeFromLeft (w);
-        k.label.setBounds (col.removeFromTop (20));
-        k.slider.setBounds (col);
+        k.label.setBounds (col.removeFromTop (18));
+        k.slider.setBounds (col.reduced (2, 0));
     }
 }

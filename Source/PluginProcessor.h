@@ -24,10 +24,11 @@ public:
     bool isMidiEffect() const override { return false; }
     double getTailLengthSeconds() const override;
 
-    int getNumPrograms() override { return 1; }
-    int getCurrentProgram() override { return 0; }
-    void setCurrentProgram (int) override {}
-    const juce::String getProgramName (int) override { return {}; }
+    // Factory presets, exposed to the host as programs
+    int getNumPrograms() override;
+    int getCurrentProgram() override;
+    void setCurrentProgram (int index) override;
+    const juce::String getProgramName (int index) override;
     void changeProgramName (int, const juce::String&) override {}
 
     void getStateInformation (juce::MemoryBlock& destData) override;
@@ -68,6 +69,9 @@ private:
     juce::SmoothedValue<float> levelSmoothed;
 
     juce::Random randomizer;
+
+    // Last preset picked; stored in the state tree too so it survives save/load
+    std::atomic<int> currentPreset { 0 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (KickProcessor)
 };
