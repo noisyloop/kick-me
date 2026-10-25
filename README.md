@@ -10,24 +10,32 @@ Parameters: Start Pitch, End Pitch, Pitch Decay, Amp Decay, Click, Drive, Level.
 
 Every push builds the plugin on GitHub Actions (Actions tab > latest "Build" run > Artifacts):
 
-- **InfinatiKick-macOS**: `Infinati Kick.vst3.zip`, `Infinati Kick.component.zip` (AU) and the standalone app. Universal (Apple Silicon + Intel), macOS 11+.
+- **InfinatiKick-macOS**: `InfinatiKick-macOS.dmg` containing VST3, AU and standalone app, plus `Install-InfinatiKick.command`. Universal (Apple Silicon + Intel), macOS 12+.
 - **InfinatiKick-Windows**: the `.vst3` folder.
 
-The macOS builds are ad-hoc signed, not notarized. After unzipping, clear the download quarantine or Live will refuse to load it:
+Extract the Actions artifact ZIP, open the DMG, quit your DAW and double-click
+`Install-InfinatiKick.command`. Press Return to install to your user account:
+VST3 in `~/Library/Audio/Plug-Ins/VST3/`, AU in
+`~/Library/Audio/Plug-Ins/Components/`, and app in `~/Applications/`.
+The installer clears quarantine on these trusted development bundles.
+The builds are ad-hoc signed and are not notarized.
 
-    xattr -dr com.apple.quarantine "Infinati Kick.vst3" "Infinati Kick.component"
+If macOS blocks the installer itself, copy the bundles from the DMG to those folders
+and run this in Terminal:
 
-Then copy `Infinati Kick.vst3` to `~/Library/Audio/Plug-Ins/VST3/` and/or `Infinati Kick.component` to `~/Library/Audio/Plug-Ins/Components/`.
+    xattr -dr com.apple.quarantine "$HOME/Library/Audio/Plug-Ins/VST3/Infinati Kick.vst3" "$HOME/Library/Audio/Plug-Ins/Components/Infinati Kick.component" "$HOME/Applications/Infinati Kick.app"
+
 On Windows, copy the `.vst3` folder to `C:\Program Files\Common Files\VST3\`.
 
 ## Build (Mac)
 
-Prerequisites: Xcode command line tools (`xcode-select --install`), CMake (`brew install cmake`).
+Prerequisites: full Xcode with its command line tools selected, and CMake (`brew install cmake`).
 
-    cmake -B build -G Xcode
+    cmake -S . -B build -G Xcode -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
     cmake --build build --config Release
 
-The VST3 and AU are copied to `~/Library/Audio/Plug-Ins/` automatically.
+Build products are in `build/InfinatiKick_artefacts/Release/`.
+Automatic installation is disabled by default; opt in with `-DINFINATI_COPY_PLUGIN=ON`.
 
 ## Build (Windows)
 
@@ -36,9 +44,8 @@ Prerequisites: Visual Studio 2022 (Desktop development with C++), CMake.
     cmake -B build
     cmake --build build --config Release
 
-The VST3 is copied to `C:\Program Files\Common Files\VST3\` automatically
-(run the terminal as Administrator, or configure with `-DINFINATI_COPY_PLUGIN=OFF` and copy the .vst3 folder from
-`build\InfinatiKick_artefacts\Release\VST3\` yourself).
+Copy the `.vst3` folder from `build\InfinatiKick_artefacts\Release\VST3\` to
+`C:\Program Files\Common Files\VST3\`.
 
 The first configure downloads JUCE from GitHub, so it takes a few minutes.
 
