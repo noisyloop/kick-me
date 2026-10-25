@@ -10,22 +10,31 @@ Parameters: Start Pitch, End Pitch, Pitch Decay, Amp Decay, Click, Drive, Level.
 
 ## Download (macOS)
 
-**[Download InfinatiKick.dmg](https://github.com/noisyloop/kick-me/releases/latest/download/InfinatiKick.dmg)** (Apple Silicon + Intel, macOS 11+)
+**[Download InfinatiKick.dmg](https://github.com/noisyloop/kick-me/releases/latest/download/InfinatiKick.dmg)** (Apple Silicon + Intel, macOS 12+)
 
-Open the DMG, then paste this into Terminal. It copies the plugin to `~/Library/Audio/Plug-Ins/VST3/InfinatiKick.vst3` and clears the download quarantine in one step (the build is not notarized, so Live won't load it otherwise):
+Open the DMG, quit Ableton Live and double-click `Install-InfinatiKick.command`, then press Return.
+It installs to your user account in one step and clears the download quarantine
+(the build is ad-hoc signed and not notarized, so Live won't load it otherwise):
+VST3 to `~/Library/Audio/Plug-Ins/VST3/InfinatiKick.vst3`, AU to
+`~/Library/Audio/Plug-Ins/Components/`, and the standalone app to `~/Applications/`.
+
+If macOS blocks the installer itself, paste this into Terminal instead, with the DMG open. It does the same for the VST3 in one command:
 
     V=~/Library/Audio/Plug-Ins/VST3; mkdir -p "$V" && rm -rf "$V/InfinatiKick.vst3" "$V/Infinati Kick.vst3" && ditto /Volumes/InfinatiKick/InfinatiKick.vst3 "$V/InfinatiKick.vst3" && xattr -cr "$V/InfinatiKick.vst3" && echo "Infinati Kick installed"
 
-It also removes an older `Infinati Kick.vst3` if you installed one from a previous build. Then rescan in Live (see below).
+Both remove an older `Infinati Kick.vst3` (from builds before 0.2.0) so Live doesn't list the plugin twice. Then rescan in Live (see below).
+
+On Windows, build from source (below) and copy the `.vst3` folder to `C:\Program Files\Common Files\VST3\`.
 
 ## Build (Mac)
 
-Prerequisites: Xcode command line tools (`xcode-select --install`), CMake (`brew install cmake`).
+Prerequisites: full Xcode with its command line tools selected, and CMake (`brew install cmake`).
 
-    cmake -B build -G Xcode
+    cmake -S . -B build -G Xcode -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
     cmake --build build --config Release
 
-`InfinatiKick.vst3` and `InfinatiKick.component` are copied to `~/Library/Audio/Plug-Ins/` automatically.
+Build products (`InfinatiKick.vst3`, `InfinatiKick.component`, `InfinatiKick.app`) are in `build/InfinatiKick_artefacts/Release/`.
+Automatic installation is disabled by default; opt in with `-DINFINATI_COPY_PLUGIN=ON`.
 
 ## Build (Windows)
 
@@ -34,9 +43,8 @@ Prerequisites: Visual Studio 2022 (Desktop development with C++), CMake.
     cmake -B build
     cmake --build build --config Release
 
-The VST3 is copied to `C:\Program Files\Common Files\VST3\` automatically
-(run the terminal as Administrator, or configure with `-DINFINATI_COPY_PLUGIN=OFF` and copy the .vst3 folder from
-`build\InfinatiKick_artefacts\Release\VST3\` yourself).
+Copy the `.vst3` folder from `build\InfinatiKick_artefacts\Release\VST3\` to
+`C:\Program Files\Common Files\VST3\`.
 
 The first configure downloads JUCE from GitHub, so it takes a few minutes.
 

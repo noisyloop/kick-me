@@ -5,23 +5,28 @@ project(InfinatiKick VERSION 0.2.0)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-option(INFINATI_COPY_PLUGIN "Copy the built plugin into the system plug-in folder" ON)
+option(INFINATI_COPY_PLUGIN "Copy the built plugin into the system plug-in folder" OFF)
 option(INFINATI_BUILD_TESTS "Build the offline render tests" ON)
 
 include(FetchContent)
 FetchContent_Declare(
     juce
     GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
-    GIT_TAG 8.0.6
+    GIT_TAG 8.0.10
     GIT_SHALLOW ON
 )
 FetchContent_MakeAvailable(juce)
+
+set(INFINATI_FORMATS VST3 Standalone)
+if (APPLE)
+    list(APPEND INFINATI_FORMATS AU)
+endif()
 
 juce_add_plugin(InfinatiKick
     COMPANY_NAME "Infinati"
     PLUGIN_MANUFACTURER_CODE Infn
     PLUGIN_CODE InKk
-    FORMATS VST3 AU Standalone
+    FORMATS ${INFINATI_FORMATS}
     VST3_CATEGORIES Instrument Drum
     PRODUCT_NAME "InfinatiKick"
     PLUGIN_NAME "Infinati Kick"

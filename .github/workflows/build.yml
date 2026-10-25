@@ -5,29 +5,41 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
 jobs:
   macos:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
+      - name: Cache JUCE sources
+        uses: actions/cache@v4
+        with:
+          path: build/_deps/juce-src
+          key: infinatikick-juce-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
+
       - name: Configure (universal arm64 + x86_64)
         run: >
-          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake -S . -B build -G Xcode -DINFINATI_COPY_PLUGIN=OFF
           -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
-          -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
 
       - name: Build
-        run: cmake --build build --config Release -j 4
+        run: cmake --build build --config Release --parallel 3
 
       - name: Render tests
         run: ctest --test-dir build -C Release --output-on-failure
 
       - name: auval (Audio Unit)
         run: |
+          mkdir -p "$HOME/Library/Audio/Plug-Ins/Components"
+          ditto build/InfinatiKick_artefacts/Release/AU/InfinatiKick.component "$HOME/Library/Audio/Plug-Ins/Components/InfinatiKick.component"
           killall -9 AudioComponentRegistrar || true
           auval -v aumu InKk Infn
 
@@ -39,18 +51,29 @@ jobs:
           $PV --strictness-level 10 --validate-in-process build/InfinatiKick_artefacts/Release/VST3/InfinatiKick.vst3
           $PV --strictness-level 10 --validate-in-process "$HOME/Library/Audio/Plug-Ins/Components/InfinatiKick.component"
 
-      - name: Build DMG
+      - name: Bundle DMG and installer
+        shell: bash
         run: |
+          set -euo pipefail
+          A=build/InfinatiKick_artefacts/Release
           S=dmg-stage
           mkdir -p "$S" dist
-          ditto build/InfinatiKick_artefacts/Release/VST3/InfinatiKick.vst3 "$S/InfinatiKick.vst3"
-          codesign --force --deep -s - "$S/InfinatiKick.vst3"
+          for b in "$A/VST3/InfinatiKick.vst3" "$A/AU/InfinatiKick.component" "$A/Standalone/InfinatiKick.app"; do
+            test -d "$b"
+            codesign --force --deep -s - "$b"
+            codesign --verify --deep --strict "$b"
+            ditto "$b" "$S/$(basename "$b")"
+          done
+          cp install-macos.command "$S/Install-InfinatiKick.command"
+          chmod +x "$S/Install-InfinatiKick.command"
           cat > "$S/Install.txt" <<'TXT'
           Infinati Kick
 
-          With this disk image open, paste this into Terminal and press Return.
-          It copies InfinatiKick.vst3 to ~/Library/Audio/Plug-Ins/VST3 and clears
-          the download quarantine in one go:
+          Quit Ableton Live, then double-click Install-InfinatiKick.command.
+
+          If macOS blocks it, paste this into Terminal instead (with this disk image open).
+          It copies InfinatiKick.vst3 to ~/Library/Audio/Plug-Ins/VST3 and clears the
+          download quarantine in one go:
 
           V=~/Library/Audio/Plug-Ins/VST3; mkdir -p "$V" && rm -rf "$V/InfinatiKick.vst3" "$V/Infinati Kick.vst3" && ditto /Volumes/InfinatiKick/InfinatiKick.vst3 "$V/InfinatiKick.vst3" && xattr -cr "$V/InfinatiKick.vst3" && echo "Infinati Kick installed"
 
@@ -61,17 +84,23 @@ jobs:
           codesign --force -s - dist/InfinatiKick.dmg
           hdiutil verify dist/InfinatiKick.dmg
 
-      - name: Check DMG install command
+      - name: Check DMG installers
+        shell: bash
         run: |
+          set -euo pipefail
           hdiutil attach -nobrowse dist/InfinatiKick.dmg
+          printf '\n\n' | /Volumes/InfinatiKick/Install-InfinatiKick.command
           V=~/Library/Audio/Plug-Ins/VST3; mkdir -p "$V" && rm -rf "$V/InfinatiKick.vst3" "$V/Infinati Kick.vst3" && ditto /Volumes/InfinatiKick/InfinatiKick.vst3 "$V/InfinatiKick.vst3" && xattr -cr "$V/InfinatiKick.vst3" && echo "Infinati Kick installed"
           hdiutil detach /Volumes/InfinatiKick
           test -f "$V/InfinatiKick.vst3/Contents/MacOS/InfinatiKick"
+          test -d "$HOME/Library/Audio/Plug-Ins/Components/InfinatiKick.component"
+          test -d "$HOME/Applications/InfinatiKick.app"
           codesign --verify --deep "$V/InfinatiKick.vst3"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: InfinatiKick-dmg
+          name: InfinatiKick-macOS
+          if-no-files-found: error
           path: dist/InfinatiKick.dmg
 
       - name: Publish release
@@ -125,7 +154,7 @@ jobs:
         run: cmake --build build
 
       - name: Render tests
-        run: ctest --test-dir build --output-on-failure
+        run: xvfb-run -a ctest --test-dir build --output-on-failure
 
       - name: pluginval (VST3)
         run: |
