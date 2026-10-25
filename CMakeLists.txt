@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(InfinatiKick VERSION 0.1.0)
+project(InfinatiKick VERSION 0.2.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -23,7 +23,8 @@ juce_add_plugin(InfinatiKick
     PLUGIN_CODE InKk
     FORMATS VST3 AU Standalone
     VST3_CATEGORIES Instrument Drum
-    PRODUCT_NAME "Infinati Kick"
+    PRODUCT_NAME "InfinatiKick"
+    PLUGIN_NAME "Infinati Kick"
     IS_SYNTH TRUE
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT FALSE

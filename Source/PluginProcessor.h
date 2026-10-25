@@ -38,6 +38,12 @@ public:
     // Set by the UI's TRIGGER button so you can audition in the standalone app.
     std::atomic<bool> uiTrigger { false };
 
+    // Peak of the last processed block, read by the UI for its pulse animation.
+    std::atomic<float> outputPeak { 0.0f };
+
+    // Message thread only: sets random kick-ish parameter values and plays a hit.
+    void randomize();
+
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
     void trigger (float velocity);
@@ -60,6 +66,8 @@ private:
     float  tailCoeff = 0.0f;
 
     juce::SmoothedValue<float> levelSmoothed;
+
+    juce::Random randomizer;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (KickProcessor)
 };
