@@ -1,31 +1,30 @@
 # Infinati Kick
 
-A simple kick drum synth (VST3, AU and Standalone) built with JUCE 8.
+A ridiculous synthwave kick drum synth (VST3, AU and Standalone) built with JUCE 8.
 
-Play any MIDI note to trigger a kick (velocity sets the hit level). In the standalone app, use the TRIGGER button.
+![Infinati Kick](docs/screenshot.png)
+
+Play any MIDI note to trigger a kick (velocity sets the hit level). TRIGGER plays a hit, RANDOMIZE rolls a new kick and plays it.
 
 Parameters: Start Pitch, End Pitch, Pitch Decay, Amp Decay, Click, Drive, Level.
 
-## Download
+## Download (macOS)
 
-Every push builds the plugin on GitHub Actions (Actions tab > latest "Build" run > Artifacts):
+**[Download InfinatiKick.dmg](https://github.com/noisyloop/kick-me/releases/latest/download/InfinatiKick.dmg)** (Apple Silicon + Intel, macOS 12+)
 
-- **InfinatiKick-macOS**: `InfinatiKick-macOS.dmg` containing VST3, AU and standalone app, plus `Install-InfinatiKick.command`. Universal (Apple Silicon + Intel), macOS 12+.
-- **InfinatiKick-Windows**: the `.vst3` folder.
+Open the DMG, quit Ableton Live and double-click `Install-InfinatiKick.command`, then press Return.
+It installs to your user account in one step and clears the download quarantine
+(the build is ad-hoc signed and not notarized, so Live won't load it otherwise):
+VST3 to `~/Library/Audio/Plug-Ins/VST3/InfinatiKick.vst3`, AU to
+`~/Library/Audio/Plug-Ins/Components/`, and the standalone app to `~/Applications/`.
 
-Extract the Actions artifact ZIP, open the DMG, quit your DAW and double-click
-`Install-InfinatiKick.command`. Press Return to install to your user account:
-VST3 in `~/Library/Audio/Plug-Ins/VST3/`, AU in
-`~/Library/Audio/Plug-Ins/Components/`, and app in `~/Applications/`.
-The installer clears quarantine on these trusted development bundles.
-The builds are ad-hoc signed and are not notarized.
+If macOS blocks the installer itself, paste this into Terminal instead, with the DMG open. It does the same for the VST3 in one command:
 
-If macOS blocks the installer itself, copy the bundles from the DMG to those folders
-and run this in Terminal:
+    V=~/Library/Audio/Plug-Ins/VST3; mkdir -p "$V" && rm -rf "$V/InfinatiKick.vst3" "$V/Infinati Kick.vst3" && ditto /Volumes/InfinatiKick/InfinatiKick.vst3 "$V/InfinatiKick.vst3" && xattr -cr "$V/InfinatiKick.vst3" && echo "Infinati Kick installed"
 
-    xattr -dr com.apple.quarantine "$HOME/Library/Audio/Plug-Ins/VST3/Infinati Kick.vst3" "$HOME/Library/Audio/Plug-Ins/Components/Infinati Kick.component" "$HOME/Applications/Infinati Kick.app"
+Both remove an older `Infinati Kick.vst3` (from builds before 0.2.0) so Live doesn't list the plugin twice. Then rescan in Live (see below).
 
-On Windows, copy the `.vst3` folder to `C:\Program Files\Common Files\VST3\`.
+On Windows, build from source (below) and copy the `.vst3` folder to `C:\Program Files\Common Files\VST3\`.
 
 ## Build (Mac)
 
@@ -34,7 +33,7 @@ Prerequisites: full Xcode with its command line tools selected, and CMake (`brew
     cmake -S . -B build -G Xcode -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
     cmake --build build --config Release
 
-Build products are in `build/InfinatiKick_artefacts/Release/`.
+Build products (`InfinatiKick.vst3`, `InfinatiKick.component`, `InfinatiKick.app`) are in `build/InfinatiKick_artefacts/Release/`.
 Automatic installation is disabled by default; opt in with `-DINFINATI_COPY_PLUGIN=ON`.
 
 ## Build (Windows)
@@ -54,7 +53,7 @@ The first configure downloads JUCE from GitHub, so it takes a few minutes.
     ctest --test-dir build -C Release --output-on-failure
 
 `Tests/RenderTests.cpp` renders the processor offline and checks silence without MIDI, hit level and decay,
-velocity response, click-free retriggering, stability at extreme settings and state save/restore.
+velocity response, click-free retriggering, stability at extreme settings, state save/restore, value text and randomize.
 CI also runs [pluginval](https://github.com/Tracktion/pluginval) at strictness 10 on every format and `auval` on the AU.
 
 ## Ableton Live

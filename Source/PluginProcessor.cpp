@@ -22,27 +22,64 @@ juce::AudioProcessorValueTreeState::ParameterLayout KickProcessor::createLayout(
 {
     using P = juce::AudioParameterFloat;
     using R = juce::NormalisableRange<float>;
+    using A = juce::AudioParameterFloatAttributes;
+
+    // Readable values in the UI and in the host's device view
+    const auto withUnit = [] (const char* unit)
+    {
+        return A().withStringFromValueFunction ([unit] (float v, int) { return juce::String (juce::roundToInt (v)) + unit; })
+                  .withValueFromStringFunction ([] (const juce::String& s) { return s.getFloatValue(); });
+    };
+    const auto percent = A().withStringFromValueFunction ([] (float v, int) { return juce::String (juce::roundToInt (v * 100.0f)) + "%"; })
+                            .withValueFromStringFunction ([] (const juce::String& s) { return s.getFloatValue() / 100.0f; });
+    const auto decibels = A().withStringFromValueFunction ([] (float v, int) { return juce::String (v, 1) + " dB"; })
+                             .withValueFromStringFunction ([] (const juce::String& s) { return s.getFloatValue(); });
 
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
     // Pitch envelope: starts at startHz, sweeps down to endHz
     params.push_back (std::make_unique<P> (juce::ParameterID { kStartHz, 1 }, "Start Pitch",
-                                           R (60.0f, 800.0f, 0.0f, 0.4f), 220.0f));
+                                           R (60.0f, 800.0f, 0.0f, 0.4f), 220.0f, withUnit (" Hz")));
     params.push_back (std::make_unique<P> (juce::ParameterID { kEndHz, 1 }, "End Pitch",
-                                           R (25.0f, 120.0f, 0.0f, 0.6f), 48.0f));
+                                           R (25.0f, 120.0f, 0.0f, 0.6f), 48.0f, withUnit (" Hz")));
     params.push_back (std::make_unique<P> (juce::ParameterID { kPitchDecay, 1 }, "Pitch Decay",
-                                           R (3.0f, 300.0f, 0.0f, 0.4f), 45.0f));
+                                           R (3.0f, 300.0f, 0.0f, 0.4f), 45.0f, withUnit (" ms")));
     // Amplitude decay (the "length" of the kick)
     params.push_back (std::make_unique<P> (juce::ParameterID { kAmpDecay, 1 }, "Amp Decay",
-                                           R (40.0f, 2000.0f, 0.0f, 0.4f), 420.0f));
+                                           R (40.0f, 2000.0f, 0.0f, 0.4f), 420.0f, withUnit (" ms")));
     params.push_back (std::make_unique<P> (juce::ParameterID { kClick, 1 }, "Click",
-                                           R (0.0f, 1.0f), 0.25f));
+                                           R (0.0f, 1.0f), 0.25f, percent));
     params.push_back (std::make_unique<P> (juce::ParameterID { kDrive, 1 }, "Drive",
-                                           R (0.0f, 1.0f), 0.30f));
+                                           R (0.0f, 1.0f), 0.30f, percent));
     params.push_back (std::make_unique<P> (juce::ParameterID { kLevel, 1 }, "Level",
-                                           R (-24.0f, 0.0f), -3.0f));
+                                           R (-24.0f, 0.0f), -3.0f, decibels));
 
     return { params.begin(), params.end() };
+}
+
+void KickProcessor::randomize()
+{
+    // Ranges that still sound like a kick; Level is left alone so the mix doesn't jump
+    struct Range { const char* id; float lo, hi; };
+    const Range ranges[] = {
+        { kStartHz,    110.0f,  520.0f },
+        { kEndHz,       32.0f,   72.0f },
+        { kPitchDecay,  12.0f,  140.0f },
+        { kAmpDecay,   150.0f, 1100.0f },
+        { kClick,        0.0f,   0.75f },
+        { kDrive,        0.0f,   0.85f },
+    };
+
+    for (const auto& r : ranges)
+    {
+        auto* param = apvts.getParameter (r.id);
+        const float v = r.lo + randomizer.nextFloat() * (r.hi - r.lo);
+        param->beginChangeGesture();
+        param->setValueNotifyingHost (param->convertTo0to1 (v));
+        param->endChangeGesture();
+    }
+
+    uiTrigger = true;
 }
 
 void KickProcessor::prepareToPlay (double newSampleRate, int)
@@ -158,6 +195,8 @@ void KickProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBu
         if (right != nullptr)
             right[i] = out;
     }
+
+    outputPeak = buffer.getMagnitude (0, 0, numSamples);
 }
 
 juce::AudioProcessorEditor* KickProcessor::createEditor()

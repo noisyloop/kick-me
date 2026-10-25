@@ -9,6 +9,9 @@ concurrency:
   group: build-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   macos:
     runs-on: macos-15
@@ -36,7 +39,7 @@ jobs:
       - name: auval (Audio Unit)
         run: |
           mkdir -p "$HOME/Library/Audio/Plug-Ins/Components"
-          ditto "build/InfinatiKick_artefacts/Release/AU/Infinati Kick.component" "$HOME/Library/Audio/Plug-Ins/Components/Infinati Kick.component"
+          ditto build/InfinatiKick_artefacts/Release/AU/InfinatiKick.component "$HOME/Library/Audio/Plug-Ins/Components/InfinatiKick.component"
           killall -9 AudioComponentRegistrar || true
           auval -v aumu InKk Infn
 
@@ -45,30 +48,72 @@ jobs:
           curl -sSLf -o pluginval.zip https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_macOS.zip
           unzip -q pluginval.zip
           PV=pluginval.app/Contents/MacOS/pluginval
-          $PV --strictness-level 10 --validate-in-process "build/InfinatiKick_artefacts/Release/VST3/Infinati Kick.vst3"
-          $PV --strictness-level 10 --validate-in-process "$HOME/Library/Audio/Plug-Ins/Components/Infinati Kick.component"
+          $PV --strictness-level 10 --validate-in-process build/InfinatiKick_artefacts/Release/VST3/InfinatiKick.vst3
+          $PV --strictness-level 10 --validate-in-process "$HOME/Library/Audio/Plug-Ins/Components/InfinatiKick.component"
 
       - name: Bundle DMG and installer
         shell: bash
         run: |
           set -euo pipefail
           A=build/InfinatiKick_artefacts/Release
-          mkdir -p dist
-          for b in "$A/VST3/Infinati Kick.vst3" "$A/AU/Infinati Kick.component" "$A/Standalone/Infinati Kick.app"; do
+          S=dmg-stage
+          mkdir -p "$S" dist
+          for b in "$A/VST3/InfinatiKick.vst3" "$A/AU/InfinatiKick.component" "$A/Standalone/InfinatiKick.app"; do
             test -d "$b"
             codesign --force --deep -s - "$b"
             codesign --verify --deep --strict "$b"
-            ditto "$b" "dist/$(basename "$b")"
+            ditto "$b" "$S/$(basename "$b")"
           done
-          cp install-macos.command dist/Install-InfinatiKick.command
-          chmod +x dist/Install-InfinatiKick.command
-          hdiutil create -volname "Infinati Kick" -srcfolder dist -ov -format UDZO InfinatiKick-macOS.dmg
+          cp install-macos.command "$S/Install-InfinatiKick.command"
+          chmod +x "$S/Install-InfinatiKick.command"
+          cat > "$S/Install.txt" <<'TXT'
+          Infinati Kick
+
+          Quit Ableton Live, then double-click Install-InfinatiKick.command.
+
+          If macOS blocks it, paste this into Terminal instead (with this disk image open).
+          It copies InfinatiKick.vst3 to ~/Library/Audio/Plug-Ins/VST3 and clears the
+          download quarantine in one go:
+
+          V=~/Library/Audio/Plug-Ins/VST3; mkdir -p "$V" && rm -rf "$V/InfinatiKick.vst3" "$V/Infinati Kick.vst3" && ditto /Volumes/InfinatiKick/InfinatiKick.vst3 "$V/InfinatiKick.vst3" && xattr -cr "$V/InfinatiKick.vst3" && echo "Infinati Kick installed"
+
+          Then in Ableton Live: Preferences > Plug-Ins > Rescan, and load
+          "Infinati Kick" from Plug-Ins > Instruments on a MIDI track.
+          TXT
+          hdiutil create -volname InfinatiKick -srcfolder "$S" -fs HFS+ -format UDZO -ov dist/InfinatiKick.dmg
+          codesign --force -s - dist/InfinatiKick.dmg
+          hdiutil verify dist/InfinatiKick.dmg
+
+      - name: Check DMG installers
+        shell: bash
+        run: |
+          set -euo pipefail
+          hdiutil attach -nobrowse dist/InfinatiKick.dmg
+          printf '\n\n' | /Volumes/InfinatiKick/Install-InfinatiKick.command
+          V=~/Library/Audio/Plug-Ins/VST3; mkdir -p "$V" && rm -rf "$V/InfinatiKick.vst3" "$V/Infinati Kick.vst3" && ditto /Volumes/InfinatiKick/InfinatiKick.vst3 "$V/InfinatiKick.vst3" && xattr -cr "$V/InfinatiKick.vst3" && echo "Infinati Kick installed"
+          hdiutil detach /Volumes/InfinatiKick
+          test -f "$V/InfinatiKick.vst3/Contents/MacOS/InfinatiKick"
+          test -d "$HOME/Library/Audio/Plug-Ins/Components/InfinatiKick.component"
+          test -d "$HOME/Applications/InfinatiKick.app"
+          codesign --verify --deep "$V/InfinatiKick.vst3"
 
       - uses: actions/upload-artifact@v4
         with:
           name: InfinatiKick-macOS
           if-no-files-found: error
-          path: InfinatiKick-macOS.dmg
+          path: dist/InfinatiKick.dmg
+
+      - name: Publish release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(sed -n 's/^project(InfinatiKick VERSION \(.*\))/\1/p' CMakeLists.txt)
+          TAG="v$VERSION"
+          gh release view "$TAG" > /dev/null 2>&1 || \
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "Infinati Kick $VERSION" \
+              --notes "macOS (Apple Silicon + Intel). Open the DMG and follow Install.txt."
+          gh release upload "$TAG" dist/InfinatiKick.dmg --clobber
 
   windows:
     runs-on: windows-latest
@@ -89,12 +134,7 @@ jobs:
         run: |
           curl -sSLf -o pluginval.zip https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Windows.zip
           unzip -q pluginval.zip
-          ./pluginval.exe --strictness-level 10 --validate-in-process "build/InfinatiKick_artefacts/Release/VST3/Infinati Kick.vst3"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: InfinatiKick-Windows
-          path: build/InfinatiKick_artefacts/Release/VST3
+          ./pluginval.exe --strictness-level 10 --validate-in-process build/InfinatiKick_artefacts/Release/VST3/InfinatiKick.vst3
 
   linux:
     runs-on: ubuntu-24.04
@@ -120,4 +160,4 @@ jobs:
         run: |
           curl -sSLf -o pluginval.zip https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Linux.zip
           unzip -q pluginval.zip
-          xvfb-run -a ./pluginval --strictness-level 10 --validate-in-process "build/InfinatiKick_artefacts/Release/VST3/Infinati Kick.vst3"
+          xvfb-run -a ./pluginval --strictness-level 10 --validate-in-process build/InfinatiKick_artefacts/Release/VST3/InfinatiKick.vst3

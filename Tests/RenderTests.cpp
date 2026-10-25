@@ -164,6 +164,36 @@ int main()
         check (std::abs (b.getTailLengthSeconds() - 9.3 * 0.9) < 0.01, "tail length follows amp decay");
     }
 
+    {
+        KickProcessor p;
+        auto text = [&p] (const char* id) { auto* q = p.apvts.getParameter (id); return q->getText (q->getValue(), 32); };
+        check (text ("startHz") == "220 Hz" && text ("click") == "25%" && text ("level") == "-3.0 dB",
+               "parameter values read as whole Hz, percent and dB");
+    }
+
+    {
+        KickProcessor p;
+        auto value = [&p] (const char* id) { return p.apvts.getRawParameterValue (id)->load(); };
+        const float before = value ("startHz");
+        bool inRange = true, changed = false;
+
+        for (int i = 0; i < 50; ++i)
+        {
+            p.randomize();
+            inRange = inRange && value ("startHz") >= 109.0f && value ("startHz") <= 521.0f
+                              && value ("endHz") >= 31.0f && value ("endHz") <= 73.0f
+                              && value ("ampDecay") >= 149.0f && value ("ampDecay") <= 1101.0f
+                              && value ("drive") <= 0.86f;
+            changed = changed || std::abs (value ("startHz") - before) > 1.0f;
+        }
+
+        check (inRange && changed, "randomize lands inside kick-friendly ranges");
+        check (std::abs (value ("level") + 3.0f) < 0.01f, "randomize leaves level alone");
+
+        auto x = render (p, 4800, {});
+        check (peak (x) > 0.1f, "randomize plays a hit");
+    }
+
     std::printf (failures == 0 ? "\nall tests passed\n" : "\n%d test(s) failed\n", failures);
     return failures == 0 ? 0 : 1;
 }
