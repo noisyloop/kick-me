@@ -11,6 +11,7 @@ Parameters: Start Pitch, End Pitch, Pitch Decay, Amp Decay, Click, Drive, Level.
 Every push builds the plugin on GitHub Actions (Actions tab > latest "Build" run > Artifacts):
 
 - **InfinatiKick-macOS**: `Infinati Kick.vst3.zip`, `Infinati Kick.component.zip` (AU) and the standalone app. Universal (Apple Silicon + Intel), macOS 11+.
+- **InfinatiKick-macOS-dmg**: `InfinatiKick-0.1.0.dmg` with the VST3, AU and app plus drag-to-install folder links and `Install.txt`.
 - **InfinatiKick-Windows**: the `.vst3` folder.
 
 The macOS builds are ad-hoc signed, not notarized. After unzipping, clear the download quarantine or Live will refuse to load it:

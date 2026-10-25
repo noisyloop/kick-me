@@ -45,6 +45,37 @@ jobs:
             ditto -c -k --keepParent "$b" "dist/$(basename "$b").zip"
           done
 
+      - name: Build DMG
+        run: |
+          A=build/InfinatiKick_artefacts/Release
+          S=dmg-stage
+          mkdir "$S"
+          ditto "$A/VST3/Infinati Kick.vst3" "$S/Infinati Kick.vst3"
+          ditto "$A/AU/Infinati Kick.component" "$S/Infinati Kick.component"
+          ditto "$A/Standalone/Infinati Kick.app" "$S/Infinati Kick.app"
+          ln -s /Library/Audio/Plug-Ins/VST3 "$S/VST3 folder"
+          ln -s /Library/Audio/Plug-Ins/Components "$S/Components folder (AU)"
+          ln -s /Applications "$S/Applications"
+          cat > "$S/Install.txt" <<'TXT'
+          Infinati Kick
+
+          1. Drag "Infinati Kick.vst3" onto "VST3 folder" and/or
+             "Infinati Kick.component" onto "Components folder (AU)".
+             (Optional: drag the app onto Applications.)
+          2. This build is not notarized. Open Terminal and run:
+               sudo xattr -dr com.apple.quarantine "/Library/Audio/Plug-Ins/VST3/Infinati Kick.vst3" "/Library/Audio/Plug-Ins/Components/Infinati Kick.component"
+          3. Ableton Live: Preferences > Plug-Ins > Rescan.
+             Load "Infinati Kick" from Plug-Ins > Instruments on a MIDI track.
+          TXT
+          hdiutil create -volname "Infinati Kick" -srcfolder "$S" -fs HFS+ -format UDZO -ov "dist/InfinatiKick-0.1.0.dmg"
+          codesign --force -s - "dist/InfinatiKick-0.1.0.dmg"
+          hdiutil verify "dist/InfinatiKick-0.1.0.dmg"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: InfinatiKick-macOS-dmg
+          path: dist/InfinatiKick-0.1.0.dmg
+
       - uses: actions/upload-artifact@v4
         with:
           name: InfinatiKick-macOS
