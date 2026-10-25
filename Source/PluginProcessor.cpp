@@ -49,6 +49,20 @@ void KickProcessor::prepareToPlay (double newSampleRate, int)
 {
     sampleRate = newSampleRate;
     active = false;
+    lastOut = 0.0f;
+    tail = 0.0f;
+    tailGain = 0.0f;
+    tailCoeff = (float) std::exp (-1.0 / (0.0015 * sampleRate));
+
+    levelSmoothed.reset (sampleRate, 0.02);
+    levelSmoothed.setCurrentAndTargetValue (
+        juce::Decibels::decibelsToGain (apvts.getRawParameterValue (kLevel)->load()));
+}
+
+double KickProcessor::getTailLengthSeconds() const
+{
+    // Time for the amp envelope to fall ~80 dB
+    return 9.3 * apvts.getRawParameterValue (kAmpDecay)->load() * 0.001;
 }
 
 bool KickProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -64,6 +78,8 @@ void KickProcessor::trigger (float v)
     timeSec = 0.0;
     velocity = juce::jlimit (0.0f, 1.0f, v);
     clickState = 0.0f;
+    tail = lastOut;
+    tailGain = std::abs (lastOut) > 1.0e-4f ? 1.0f : 0.0f;
 }
 
 void KickProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
@@ -80,7 +96,7 @@ void KickProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBu
     const float ampTau     = juce::jmax (0.005f,  apvts.getRawParameterValue (kAmpDecay)->load() * 0.001f);
     const float clickAmt   = apvts.getRawParameterValue (kClick)->load();
     const float drive      = apvts.getRawParameterValue (kDrive)->load();
-    const float level      = juce::Decibels::decibelsToGain (apvts.getRawParameterValue (kLevel)->load());
+    levelSmoothed.setTargetValue (juce::Decibels::decibelsToGain (apvts.getRawParameterValue (kLevel)->load()));
 
     const float driveGain = 1.0f + drive * 9.0f;
     const float driveNorm = 1.0f / std::tanh (driveGain);
@@ -105,6 +121,7 @@ void KickProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBu
         }
 
         float out = 0.0f;
+        const float level = levelSmoothed.getNextValue();
 
         if (active)
         {
@@ -132,6 +149,10 @@ void KickProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBu
             if (env < 1.0e-4f && t > 0.01)
                 active = false;
         }
+
+        out = out * (1.0f - tailGain) + tail * tailGain;
+        tailGain *= tailCoeff;
+        lastOut = out;
 
         left[i] = out;
         if (right != nullptr)

@@ -5,6 +5,9 @@ project(InfinatiKick VERSION 0.1.0)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+option(INFINATI_COPY_PLUGIN "Copy the built plugin into the system plug-in folder" ON)
+option(INFINATI_BUILD_TESTS "Build the offline render tests" ON)
+
 include(FetchContent)
 FetchContent_Declare(
     juce
@@ -18,12 +21,13 @@ juce_add_plugin(InfinatiKick
     COMPANY_NAME "Infinati"
     PLUGIN_MANUFACTURER_CODE Infn
     PLUGIN_CODE InKk
-    FORMATS VST3 Standalone
+    FORMATS VST3 AU Standalone
+    VST3_CATEGORIES Instrument Drum
     PRODUCT_NAME "Infinati Kick"
     IS_SYNTH TRUE
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT FALSE
-    COPY_PLUGIN_AFTER_BUILD TRUE
+    COPY_PLUGIN_AFTER_BUILD ${INFINATI_COPY_PLUGIN}
 )
 
 target_sources(InfinatiKick PRIVATE
@@ -45,3 +49,17 @@ target_link_libraries(InfinatiKick
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags
 )
+
+if (INFINATI_BUILD_TESTS)
+    enable_testing()
+
+    add_executable(InfinatiKickTests Tests/RenderTests.cpp)
+    target_include_directories(InfinatiKickTests PRIVATE
+        Source
+        $<TARGET_PROPERTY:InfinatiKick,INCLUDE_DIRECTORIES>)
+    target_compile_definitions(InfinatiKickTests PRIVATE
+        $<TARGET_PROPERTY:InfinatiKick,COMPILE_DEFINITIONS>)
+    target_link_libraries(InfinatiKickTests PRIVATE InfinatiKick)
+
+    add_test(NAME render COMMAND InfinatiKickTests)
+endif()

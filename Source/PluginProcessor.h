@@ -13,6 +13,7 @@ public:
     void releaseResources() override {}
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+    using juce::AudioProcessor::processBlock;
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
@@ -21,7 +22,7 @@ public:
     bool acceptsMidi() const override { return true; }
     bool producesMidi() const override { return false; }
     bool isMidiEffect() const override { return false; }
-    double getTailLengthSeconds() const override { return 2.0; }
+    double getTailLengthSeconds() const override;
 
     int getNumPrograms() override { return 1; }
     int getCurrentProgram() override { return 0; }
@@ -50,6 +51,15 @@ private:
     float  velocity = 1.0f;
     float  clickState = 0.0f;
     juce::Random rng;
+
+    // Declick: when a new hit cuts off the previous one, crossfade from the
+    // old output into the new hit over ~1.5 ms instead of jumping.
+    float  lastOut = 0.0f;
+    float  tail = 0.0f;
+    float  tailGain = 0.0f;
+    float  tailCoeff = 0.0f;
+
+    juce::SmoothedValue<float> levelSmoothed;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (KickProcessor)
 };
