@@ -9,14 +9,20 @@ concurrency:
   group: build-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Read-only by default; only the macOS job, which publishes the release, can write.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   macos:
     runs-on: macos-15
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Don't leave the write token in .git/config for later steps (pluginval etc.) to read.
+          persist-credentials: false
 
       - name: Cache JUCE sources
         uses: actions/cache@v4
@@ -45,7 +51,9 @@ jobs:
 
       - name: pluginval (VST3 + AU)
         run: |
-          curl -sSLf -o pluginval.zip https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_macOS.zip
+          # Pinned version + checksum: this binary runs before the DMG is built and signed.
+          curl -sSLf -o pluginval.zip https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_macOS.zip
+          echo "3c4c533bda0c5059eea3ddaea752d757ee2025041f0f47e6bcb0e87f6082b29f  pluginval.zip" | shasum -a 256 -c -
           unzip -q pluginval.zip
           PV=pluginval.app/Contents/MacOS/pluginval
           $PV --strictness-level 10 --validate-in-process build/KickMe_artefacts/Release/VST3/KickMe.vst3
@@ -103,8 +111,10 @@ jobs:
           if-no-files-found: error
           path: dist/KickMe.dmg
 
+      # Only main publishes. Feature-branch pushes used to upload (--clobber) their DMG to the
+      # release the README links, shipping unreviewed builds that users then de-quarantine.
       - name: Publish release
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -132,7 +142,8 @@ jobs:
       - name: pluginval (VST3)
         shell: bash
         run: |
-          curl -sSLf -o pluginval.zip https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Windows.zip
+          curl -sSLf -o pluginval.zip https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_Windows.zip
+          echo "c08e61ce3b96db41636f8ec7e76f4c7e2c13ebdac7fa1b5a1f52b4f32ec715ab  pluginval.zip" | sha256sum -c -
           unzip -q pluginval.zip
           ./pluginval.exe --strictness-level 10 --validate-in-process build/KickMe_artefacts/Release/VST3/KickMe.vst3
 
@@ -158,6 +169,7 @@ jobs:
 
       - name: pluginval (VST3)
         run: |
-          curl -sSLf -o pluginval.zip https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Linux.zip
+          curl -sSLf -o pluginval.zip https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_Linux.zip
+          echo "c01c49d8063965c4c2dea8324468336768f5c9139e0b1caebde14c2400b55352  pluginval.zip" | sha256sum -c -
           unzip -q pluginval.zip
           xvfb-run -a ./pluginval --strictness-level 10 --validate-in-process build/KickMe_artefacts/Release/VST3/KickMe.vst3
