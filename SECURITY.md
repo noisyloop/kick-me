@@ -27,6 +27,15 @@ branches (`claude/…`, `codex/…`) did run it; for example, run 40182858953 on
 could replace the download, and the install instructions then have users strip Gatekeeper's
 quarantine from it. *Fix:* publish only when `github.ref == 'refs/heads/main'`.
 
+GitHub Actions is currently switched off on this repo (deliberately), so this can't happen right
+now; the fix matters as soon as Actions is turned back on.
+
+## Verification
+
+These changes were reviewed by reading the code and have not been compiled or tested: Actions is off
+and the build wasn't run locally. The new render test (`NaN in saved state…`) and the pinned
+pluginval checksums are exercised the next time CI or a local `ctest` runs.
+
 ### Fixed: write token exposed to an unpinned binary
 
 The whole workflow had `contents: write`, `actions/checkout` left that token in `.git/config`, and
