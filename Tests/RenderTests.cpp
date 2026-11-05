@@ -165,6 +165,26 @@ int main()
     }
 
     {
+        // A tampered project/preset with value="nan" must not reach the audio (or latch NaN).
+        KickProcessor a;
+        auto xml = a.apvts.copyState().createXml();
+        for (auto* param : xml->getChildIterator())
+            if (param->getStringAttribute ("id") == "startHz" || param->getStringAttribute ("id") == "level")
+                param->setAttribute ("value", "nan");
+        juce::MemoryBlock bad;
+        juce::AudioProcessor::copyXmlToBinary (*xml, bad);
+
+        KickProcessor b;
+        b.setStateInformation (bad.getData(), (int) bad.getSize());
+        const float s = b.apvts.getRawParameterValue ("startHz")->load();
+        const float l = b.apvts.getRawParameterValue ("level")->load();
+        check (std::isfinite (s) && std::isfinite (l), "NaN in saved state is reset to defaults");
+
+        auto x = render (b, 48000, { { 0, 1.0f }, { 24000, 1.0f } });
+        check (allFinite (x) && peak (x) > 0.2f && peak (x) <= 1.0f, "state with NaN still renders finite hits");
+    }
+
+    {
         KickProcessor p;
         auto text = [&p] (const char* id) { auto* q = p.apvts.getParameter (id); return q->getText (q->getValue(), 32); };
         check (text ("startHz") == "220 Hz" && text ("click") == "25%" && text ("level") == "-3.0 dB",

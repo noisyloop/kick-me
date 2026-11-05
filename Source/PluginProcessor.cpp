@@ -193,7 +193,22 @@ void KickProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBu
     const float ampTau     = juce::jmax (0.005f,  apvts.getRawParameterValue (kAmpDecay)->load() * 0.001f);
     const float clickAmt   = apvts.getRawParameterValue (kClick)->load();
     const float drive      = apvts.getRawParameterValue (kDrive)->load();
-    levelSmoothed.setTargetValue (juce::Decibels::decibelsToGain (apvts.getRawParameterValue (kLevel)->load()));
+    const float levelDb    = apvts.getRawParameterValue (kLevel)->load();
+
+    // Never hand NaN/inf to the host: it can poison effects and busses downstream. A non-finite
+    // parameter (from a bad host or state) renders silence for the block instead.
+    for (float v : { startHz, endHz, pitchTau, ampTau, clickAmt, drive, levelDb })
+    {
+        if (! std::isfinite (v))
+        {
+            active = false;
+            lastOut = tail = tailGain = 0.0f;
+            outputPeak = 0.0f;
+            return;  // buffer was cleared above
+        }
+    }
+
+    levelSmoothed.setTargetValue (juce::Decibels::decibelsToGain (levelDb));
 
     const float driveGain = 1.0f + drive * 9.0f;
     const float driveNorm = 1.0f / std::tanh (driveGain);
@@ -249,6 +264,15 @@ void KickProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBu
 
         out = out * (1.0f - tailGain) + tail * tailGain;
         tailGain *= tailCoeff;
+
+        // Last line of defence: a NaN would latch through lastOut -> tail (NaN * 0 is still NaN)
+        // and silence-poison every later block, so reset the voice instead of emitting it.
+        if (! std::isfinite (out))
+        {
+            out = 0.0f;
+            active = false;
+            tail = tailGain = 0.0f;
+        }
         lastOut = out;
 
         left[i] = out;
@@ -277,6 +301,13 @@ void KickProcessor::setStateInformation (const void* data, int sizeInBytes)
         {
             apvts.replaceState (juce::ValueTree::fromXml (*xml));
             currentPreset = juce::jlimit (0, getNumPrograms() - 1, (int) apvts.state.getProperty (kPresetProperty, 0));
+
+            // State comes from project and preset files, which can be edited or shared. JUCE reads
+            // value="nan" as NaN, and its range clamp lets NaN through, so a bad file could put NaN
+            // in a parameter. Put any non-finite parameter back to its default.
+            for (auto* param : getParameters())
+                if (! std::isfinite (param->getValue()))
+                    param->setValueNotifyingHost (param->getDefaultValue());
         }
 }
 
